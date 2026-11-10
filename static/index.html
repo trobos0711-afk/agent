@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Generator Data Excel</title>
+<style>
+body{font-family:system-ui,sans-serif;background:#f4f5f7;margin:0;display:grid;place-items:center;min-height:100vh}
+main{background:#fff;padding:28px;border-radius:12px;width:min(460px,92vw);box-shadow:0 2px 12px #0002}
+h1{font-size:20px;margin:0 0 18px}
+label{display:block;font-size:14px;margin:14px 0 6px;font-weight:600}
+input,textarea,button{width:100%;box-sizing:border-box;font:inherit;padding:10px;border:1px solid #ccc;border-radius:8px}
+button{background:#6d28d9;color:#fff;border:0;margin-top:20px;cursor:pointer;font-weight:600}
+button:disabled{opacity:.6;cursor:wait}
+#msg{margin-top:16px;font-size:14px;white-space:pre-wrap}
+.err{color:#b91c1c}
+</style></head><body><main>
+<h1>Generator Data Excel</h1>
+<label>1. File Excel / CSV contoh (opsional)</label>
+<input type="file" id="file" accept=".xlsx,.xls,.csv">
+<label>2. Berapa baris data yang dibutuhkan?</label>
+<input type="number" id="rows" value="100" min="1" max="100000">
+<label>3. Catatan tambahan (opsional)</label>
+<textarea id="note" rows="2" placeholder="mis. tanggal sepanjang tahun 2025"></textarea>
+<div id="keybox" hidden><label>Kunci akses</label><input type="password" id="key"></div>
+<button id="go">Generate &amp; Unduh</button>
+<div id="msg"></div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+$("key").value=localStorage.getItem("akey")||"";
+async function go(){
+  const msg=$("msg"), btn=$("go"); msg.className=""; 
+  const n=parseInt($("rows").value)||0;
+  if(n<1){msg.className="err";msg.textContent="Isi jumlah baris minimal 1.";return}
+  const f=$("file").files[0], h={}, key=$("key").value;
+  if(key){h["x-api-key"]=key;localStorage.setItem("akey",key)}
+  let ins=f?`Buat ${n} baris data simulasi dengan struktur kolom dan pola nilai yang sama seperti file yang diunggah.`
+           :`Buat ${n} baris data simulasi.`;
+  if($("note").value.trim()) ins+=" "+$("note").value.trim();
+  const fd=new FormData(); fd.append("instruction",ins); if(f) fd.append("file",f);
+  btn.disabled=true; msg.textContent="Sedang membuat data, tunggu sebentar...";
+  try{
+    const r=await fetch("/simulate",{method:"POST",body:fd,headers:h});
+    if(r.status==401){$("keybox").hidden=false;throw new Error("Kunci akses diperlukan atau salah.")}
+    if(!r.ok) throw new Error((await r.text()).slice(0,300));
+    const j=await r.json();
+    if(!j.file_id) throw new Error(j.message||"File tidak dihasilkan.");
+    const d=await fetch(j.download_url,{headers:h});
+    if(!d.ok) throw new Error("Gagal mengunduh file.");
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(await d.blob()); a.download=`simulasi_${j.file_id}.xlsx`; a.click();
+    msg.textContent="Selesai, file terunduh.\n"+(j.message||"");
+  }catch(e){msg.className="err";msg.textContent=e.message}
+  btn.disabled=false;
+}
+$("go").onclick=go;
+</script></body></html>
