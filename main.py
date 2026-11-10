@@ -13,6 +13,11 @@ def check_auth(key):
         raise HTTPException(401, "API key salah")
 
 
+@app.get("/", include_in_schema=False)
+def index():
+    return FileResponse(os.path.join(os.path.dirname(__file__), "static", "index.html"))
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
